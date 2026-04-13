@@ -159,26 +159,52 @@ def read_json_file(path: Path, default: Any = None) -> Any:
         return default
 
 
-def read_jsonl(path: Path) -> List[dict]:
+def save_json_file(path: Path, data: Any, indent: int = 2) -> None:
+    """Write data to a JSON file atomically. Wrapper for atomic_json_write."""
+    atomic_json_write(path, data, indent=indent)
+
+
+def read_jsonl(path: Path, ignore_errors: bool = True) -> List[dict]:
     """Read a JSONL file (one JSON object per line).
 
     Returns a list of parsed objects, skipping blank lines.
+    If ignore_errors is True, individual malformed lines are skipped.
     """
     entries = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                    if ignore_errors:
+                        logger.debug("Skipping malformed JSONL line %d in %s: %s", line_num, path, exc)
+                        continue
+                    raise
+    except (OSError, IOError) as exc:
+        logger.debug("Failed to read JSONL file %s: %s", path, exc)
     return entries
 
 
-def append_jsonl(path: Path, entry: dict) -> None:
+def append_jsonl(path: Path, entry: dict, flush: bool = True) -> None:
     """Append a single JSON object as a new line to a JSONL file."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            if flush:
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except (OSError, IOError):
+                    # Some filesystems or environments might not support fsync on all files
+                    pass
+    except (OSError, IOError) as exc:
+        logger.error("Failed to append to JSONL file %s: %s", path, exc)
 
 
 # ─── Environment Variable Helpers ─────────────────────────────────────────────

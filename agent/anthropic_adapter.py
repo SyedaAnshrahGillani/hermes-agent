@@ -16,6 +16,7 @@ import logging
 import os
 from pathlib import Path
 
+from utils import read_json_file
 from hermes_constants import get_hermes_home
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
@@ -311,7 +312,7 @@ def read_claude_code_credentials() -> Optional[Dict[str, Any]]:
     cred_path = Path.home() / ".claude" / ".credentials.json"
     if cred_path.exists():
         try:
-            data = json.loads(cred_path.read_text(encoding="utf-8"))
+            data = read_json_file(cred_path)
             oauth_data = data.get("claudeAiOauth")
             if oauth_data and isinstance(oauth_data, dict):
                 access_token = oauth_data.get("accessToken", "")
@@ -333,7 +334,7 @@ def read_claude_managed_key() -> Optional[str]:
     claude_json = Path.home() / ".claude.json"
     if claude_json.exists():
         try:
-            data = json.loads(claude_json.read_text(encoding="utf-8"))
+            data = read_json_file(claude_json)
             primary_key = data.get("primaryApiKey", "")
             if isinstance(primary_key, str) and primary_key.strip():
                 return primary_key.strip()
@@ -461,7 +462,7 @@ def _write_claude_code_credentials(
         # Read existing file to preserve other fields
         existing = {}
         if cred_path.exists():
-            existing = json.loads(cred_path.read_text(encoding="utf-8"))
+            existing = read_json_file(cred_path)
 
         oauth_data: Dict[str, Any] = {
             "accessToken": access_token,
@@ -732,7 +733,7 @@ def read_hermes_oauth_credentials() -> Optional[Dict[str, Any]]:
     """Read Hermes-managed OAuth credentials from ~/.hermes/.anthropic_oauth.json."""
     if _HERMES_OAUTH_FILE.exists():
         try:
-            data = json.loads(_HERMES_OAUTH_FILE.read_text(encoding="utf-8"))
+            data = read_json_file(_HERMES_OAUTH_FILE)
             if data.get("accessToken"):
                 return data
         except (json.JSONDecodeError, OSError, IOError) as e:
